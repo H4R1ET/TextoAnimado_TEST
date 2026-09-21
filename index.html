@@ -14,21 +14,38 @@ body {
 body::before {
     content: ''; position: absolute; inset: 0;
     background: radial-gradient(circle at center, rgba(120, 90, 10, 0.4) 0%, rgba(5, 5, 5, 1) 70%);
-    animation: pulse-bg 5s infinite alternate ease-in-out; z-index: -1;
+    animation: pulse-bg 5s infinite alternate ease-in-out;
+    animation-play-state: paused;
+    z-index: -1;
 }
 @keyframes pulse-bg { 0% { opacity: 0.7; } 100% { opacity: 1; } }
 .container { display: flex; flex-direction: column; align-items: center; z-index: 1; }
 .flower-wrapper {
     margin-bottom: 20px;
     animation: medal-glow 3s infinite alternate ease-in-out;
+    animation-play-state: paused;
 }
 @keyframes medal-glow {
     0% { filter: drop-shadow(0 0 5px #B8860B) drop-shadow(0 0 10px #DAA520) brightness(0.9); }
     100% { filter: drop-shadow(0 0 10px #FFD700) drop-shadow(0 0 20px #FFA500) brightness(1.2); }
 }
 pre { margin: 0; white-space: pre; line-height: 1.1; font-size: clamp(4px, 1vw, 10px); font-weight: bold; }
-.char { display: inline-block; animation: pixel-wave 1.2s infinite steps(3); }
+.char {
+    display: inline-block;
+    animation: pixel-wave 1.2s infinite steps(3);
+    animation-delay: var(--wave-delay, 0s);
+    animation-play-state: paused;
+}
 @keyframes pixel-wave { 0%, 100% { transform: translateY(0); } 33% { transform: translateY(-1.5px); } 66% { transform: translateY(1.5px); } }
+
+.effects-active body::before,
+body.effects-active::before {
+    animation-play-state: running;
+}
+.effects-active .flower-wrapper,
+.effects-active .char {
+    animation-play-state: running;
+}
 .main-message {
     height: 30px; color: #fff; font-size: clamp(16px, 4vw, 24px); letter-spacing: 2px;
     text-align: center; transition: all 1.5s ease;
@@ -88,25 +105,36 @@ const finalTargetText = "Te deseo un feliz día <3";
 const hackerChars = "JAHARIET!@#$%&*<>M00Npapupro";
 
 let index = 0;
-const chars = art.split('');
-let outputHTML = "";
+const chars = Array.from(art);
+const CHARS_PER_FRAME = 90;
 
+// The flower is built incrementally instead of recreating the entire innerHTML
+// on every frame. This avoids repeatedly parsing an increasingly large string.
 function typeASCII() {
-    let limit = Math.min(index + 35, chars.length);
+    const fragment = document.createDocumentFragment();
+    const limit = Math.min(index + CHARS_PER_FRAME, chars.length);
+
     for (; index < limit; index++) {
-        let char = chars[index];
+        const char = chars[index];
+
         if (char === ' ' || char === '\n') {
-            outputHTML += char;
+            fragment.appendChild(document.createTextNode(char));
         } else {
-            let delay = -(index % 25) * 0.1;
-            outputHTML += `<span class="char" style="animation-delay: ${delay}s">${char}</span>`;
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.textContent = char;
+            span.style.setProperty('--wave-delay', `${-(index % 25) * 0.1}s`);
+            fragment.appendChild(span);
         }
     }
-    flowerEl.innerHTML = outputHTML;
+
+    flowerEl.appendChild(fragment);
 
     if (index < chars.length) {
         requestAnimationFrame(typeASCII);
     } else {
+        // Only now enable the continuous effects.
+        document.body.classList.add('effects-active');
         setTimeout(startHackerDecoding, 300);
     }
 }
